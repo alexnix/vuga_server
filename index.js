@@ -58,11 +58,12 @@ app.post("/login", function(req, res){
 });
 
 app.post("/loginWithPhone", function(req, res){
+	console.log(req.body);
 	db.findOne({phone: req.body.phone}, function(err, doc){
 		if(!err && doc){
 			res.status(200).send(doc);
 		} else {
-			res.status(404).send();
+			res.status(404).send({});
 		}
 	});
 });
