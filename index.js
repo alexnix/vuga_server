@@ -98,8 +98,94 @@ app.post('/ping', function(req, res){
 	res.send({message:"salut lume"});
 });
 
+app.post("/updateCounter/mtn", function(req, res) {
+	//console.log(req.body);
+	var msg = req.body.message;
+	var meg_parts = msg.split(" ");
+	var amt = meg_parts[3];
+	var from = meg_parts[7];
+	var row_from = from.split(":")[1];
+	var row_amt = parseInt(amt.split(":")[1].substr(3, amt.split(":")[1].length));
+	
+	db.update({phone: row_from}, {$inc:{counter: row_amt}}, {}, function(err, doc){
+		res.status(200).send();		
+	});
+});
+
+app.post("/updateCounter/tg", function(req, res) {
+	console.log(req.body);
+	var msg = req.body.message;
+	var msg_parts = msg.split(" ");
+	
+	var from = msg_parts[11];
+	var amt = msg_parts[9];
+	
+	db.update({phone: from}, {$inc: {counter: amt}}, {}, function(err, doc) {
+	   res.status(200).send(); 
+	});
+	
+});
+
+app.post("/updateCounter/air", function(req, res) {
+	console.log(req.body);
+	var msg = req.body.message;
+	var msg_parts = msg.split(" ");
+	
+	var from = "250" + msg_parts[6];
+	var amt = msg_parts[3];
+	
+	db.update({phone: from}, {$inc: {counter: amt}}, {}, function(err, doc) {
+	   res.status(200).send(); 
+	});
+	
+	res.status(200).send();
+});
+
+var HP_HOST = "52.21.130.230", HP_PORT = 12321;
+var ORIGIN_CLIENT = "this_is_vuga_client";
+var net = require('net');
+
+app.post("/transaction", function(req, res, next){
+
+	db.findOne({_id: req.body._id}, function(err, doc){
+		req.user = doc;
+		next();
+	});
+
+},function(req, res){
+
+	var client = new net.Socket();
+
+	var json_for_hp = {
+		origin: ORIGIN_CLIENT,
+		phone: req.body.phone,
+		amount: String(req.body.amount),
+	};
+
+	client.connect(HP_PORT, HP_HOST, function(){
+		client.write( JSON.stringify(json_for_hp) );
+	});
+
+	client.on('data', function(data){
+		// update db
+		var transaction = {
+			from: req.user.phone,
+			to: req.body.phone,
+			amount: req.body.amount,
+			date: new Date(),
+			status: String(data),
+		};
+		db.update({_id: req.body._id}, { $push: { transactions: transaction } }, {}, function(err, doc){
+			console.log("Inserted");
+		});
+		// push gcm
+		client.destroy();
+	});
+
+});
 
 
-http.listen(3000, function(){
+
+http.listen(process.env.PORT || 3000, function(){
   console.log('listening on *:3000');
 });
