@@ -10,15 +10,38 @@ app.use(bodyParser.urlencoded({ extended: false }))
 app.use(bodyParser.json())
 
 
+function removePhonePlus(req, res, next){
+	if( req.body.phone[0] == "+" )
+		req.body.phone = req.body.phone.substr(1, req.body.phone.length);
+	next();
+}
 
-app.post("/register", function(req, res){
+function date () {
+	var today = new Date();
+    var dd = today.getDate();
+    var mm = today.getMonth()+1; //January is 0!
+
+    var yyyy = today.getFullYear();
+    if(dd<10){
+        dd='0'+dd
+    } 
+    if(mm<10){
+        mm='0'+mm
+    } 
+    return dd+'/'+mm+'/'+yyyy;
+}
+
+app.post("/register", removePhonePlus, function(req, res){
 	db.find({name: req.name}, function(err, doc){
 		if(doc){
 			db.insert({
 				name: req.body.name,
 				phone: req.body.phone,
 				password: crypto.createHash('md5').update(req.body.password).digest("hex"),
-				transactions: [],
+				transactions: {
+					incoming:[],
+					outgoing:[],
+				},
 				counter: 0,
 			}, function(err, doc){
 				res.status(200).send(doc);
@@ -57,7 +80,7 @@ app.post("/login", function(req, res){
 	})
 });
 
-app.post("/loginWithPhone", function(req, res){
+app.post("/loginWithPhone", removePhonePlus, function(req, res){
 	console.log(req.body);
 	db.findOne({phone: req.body.phone}, function(err, doc){
 		if(!err && doc){
@@ -87,27 +110,30 @@ app.get('/me/:id', function(req, res){
 	});
 });
 
-app.get('/me/counter', function(req, res){
-});
-
-app.get('/me/transactions', function(req, res){
-});
-
-app.post('/ping', function(req, res){
-	console.log(req.body);
-	res.send({message:"salut lume"});
-});
+var OUTGOING_TRANSACTION = "outgoing_transaction", INCOME_TRANSACTION = "incoming_transaction";
 
 app.post("/updateCounter/mtn", function(req, res) {
-	//console.log(req.body);
+	console.log(req.body);
 	var msg = req.body.message;
-	var meg_parts = msg.split(" ");
-	var amt = meg_parts[3];
-	var from = meg_parts[7];
-	var row_from = from.split(":")[1];
-	var row_amt = parseInt(amt.split(":")[1].substr(3, amt.split(":")[1].length));
+	var msg_parts = msg.split(" ");
+
+	var row_amt = parseInt(msg_parts[3]);
 	
-	db.update({phone: row_from}, {$inc:{counter: row_amt}}, {}, function(err, doc){
+	var i = 3
+	while( msg_parts[i][0] != "(" ) i++;
+	var row_from = msg_parts[i].substr(1, msg_parts[i].length - 2);
+	
+	var mmm = row_from + " > " + row_amt;
+	console.log(mmm);
+
+	var transaction = {
+		type: INCOME_TRANSACTION,
+		from: row_from,
+		amount: row_amt,
+		date: date(),
+	}
+	
+	db.update({phone: row_from}, {$inc:{counter: row_amt}, $push: {"transactions.incoming": transaction}}, {}, function(err, doc){
 		res.status(200).send();		
 	});
 });
@@ -118,9 +144,16 @@ app.post("/updateCounter/tg", function(req, res) {
 	var msg_parts = msg.split(" ");
 	
 	var from = msg_parts[11];
-	var amt = msg_parts[9];
+	var amt = parseInt(msg_parts[9]);
 	
-	db.update({phone: from}, {$inc: {counter: amt}}, {}, function(err, doc) {
+	var transaction = {
+		type: INCOME_TRANSACTION,
+		from: from,
+		amount: amt,
+		date: date(),
+	}
+	
+	db.update({phone: from}, {$inc: {counter: amt}, $push: {"transactions.incoming": transaction}}, {}, function(err, doc) {
 	   res.status(200).send(); 
 	});
 	
@@ -132,13 +165,23 @@ app.post("/updateCounter/air", function(req, res) {
 	var msg_parts = msg.split(" ");
 	
 	var from = "250" + msg_parts[6];
-	var amt = msg_parts[3];
+	var amt = parseInt(msg_parts[3]);
 	
-	db.update({phone: from}, {$inc: {counter: amt}}, {}, function(err, doc) {
-	   res.status(200).send(); 
+	var transaction = {
+		type: INCOME_TRANSACTION,
+		from: from,
+		amount: amt,
+		date: date(),
+	};
+	
+	db.update({phone: from}, {$inc: {counter: amt}, $push: {"transactions.incoming": transaction}}, {}, function(err, doc) {
+		if(!err)
+	   		res.status(200).send(); 
+	   	else
+	   		console.log(err);
 	});
 	
-	res.status(200).send();
+	//res.status(200).send();
 });
 
 var HP_HOST = "52.21.130.230", HP_PORT = 12321;
@@ -148,8 +191,14 @@ var net = require('net');
 app.post("/transaction", function(req, res, next){
 
 	db.findOne({_id: req.body._id}, function(err, doc){
-		req.user = doc;
-		next();
+		if( !doc )
+			res.status(401).send({error:"Unauthorisated."});
+		else if( doc.counter < parseInt(req.body.amount) )
+			res.status(401).send({error:"You don`t have enought credit."});
+		else {
+			req.user = doc;
+			next();
+		}
 	});
 
 },function(req, res){
@@ -169,14 +218,22 @@ app.post("/transaction", function(req, res, next){
 	client.on('data', function(data){
 		// update db
 		var transaction = {
+			type: OUTGOING_TRANSACTION,
 			from: req.user.phone,
 			to: req.body.phone,
 			amount: req.body.amount,
-			date: new Date(),
+			date: date(),
 			status: String(data),
 		};
-		db.update({_id: req.body._id}, { $push: { transactions: transaction } }, {}, function(err, doc){
-			console.log("Inserted");
+		
+		// if the request failed, count must be inc with 0 (not changed)
+		if( String(data) != "0" ) req.body.amount = 0;
+		
+		db.update({_id: req.body._id}, { $push: { "transactions.outgoing": transaction }, $inc: { counter: -parseInt(req.body.amount)} }, {}, function(err, doc){
+			if( String(data) == "0" )
+				res.status(200).send({message: "Transaction succeded."});
+			else
+				res.status(200).send({message: "Transaction failed."});
 		});
 		// push gcm
 		client.destroy();
@@ -184,8 +241,6 @@ app.post("/transaction", function(req, res, next){
 
 });
 
-
-
 http.listen(process.env.PORT || 3000, function(){
-  console.log('listening on *:3000');
+  console.log('Vuga backend started.');
 });
