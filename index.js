@@ -241,6 +241,6 @@ app.post("/transaction", function(req, res, next){
 
 });
 
-http.listen(process.env.PORT || 3000, function(){
+http.listen(process.env.PORT || 3000, process.env.IP || "0.0.0.0", function(){
   console.log('Vuga backend started.');
 });
