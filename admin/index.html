@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<link rel="stylesheet" href="/angular-bootstrap/ui-bootstrap-csp.css">
+		<title></title>
+		<style type="text/css">
+			.transactions {
+				padding-left: 30px;
+				background-color: #efefef;
+				padding-top: 10px;
+				padding-bottom: 10px;
+			}
+			h2 {
+				cursor: pointer;
+			}
+		</style>
+	</head>
+	<body ng-app="app">
+
+		<div ng-controller="mainCtrl">
+			<init ng-init="id = -1"/>
+
+			<div class="header" ng-repeat="user in db" > 
+
+				<h2 ng-click="$parent.id=user._id">{{user.name}} - {{user.phone}}</h2>
+
+				<div class="transactions" ng-show="id==user._id">
+					<h5 ng-show="user.transactions.incoming.length > 0">Received Transactions</h1>
+					<ul>
+						<li ng-repeat="transaction in user.transactions.incoming">Added {{transaction.amount}} on {{transaction.date}}</li>
+					</ul>
+
+					<h5 ng-show="user.transactions.outgoing.length > 0">Sent Transactions</h5>
+					<ul>
+						<li ng-repeat="transaction in user.transactions.outgoing">Sent {{transaction.amount}} to {{transaction.to}} on {{transaction.date}} (status code {{transaction.status}})</li>
+					</ul>
+					<h5 ng-show="!user.transactions.incoming.length > 0 && !user.transactions.outgoing.length > 0">No data to show</h5>
+				</div>
+
+			</div>
+		</div>
+
+		<script type="text/javascript" src="/angular/angular.min.js"></script>
+		<script type="text/javascript" src="app.js"></script>
+	</body>
+</html>

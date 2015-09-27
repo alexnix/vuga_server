@@ -241,6 +241,19 @@ app.post("/transaction", function(req, res, next){
 
 });
 
+app.get("/givemeall", function(req, res){
+	db.find({}, function(err, doc){
+		res.status(200).send(doc);
+	});
+});
+
+app.use(express.static(__dirname + '/bower_components'));
+app.use(express.static(__dirname + '/admin/app'));
+app.use(express.static(__dirname + '/admin/templates'));
+app.get('/*', function(req, res){
+	res.sendFile(__dirname + '/admin/index.html');
+});
+
 http.listen(process.env.PORT || 3000, process.env.IP || "0.0.0.0", function(){
   console.log('Vuga backend started.');
 });
