@@ -133,7 +133,7 @@ app.post("/updateCounter/mtn", function(req, res) {
 		date: date(),
 	};
 	
-	if( !row_amt.isNaN() )
+	if( Number(row_amt) != NaN )
 		db.update({phone: row_from}, {$inc:{counter: row_amt}, $push: {"transactions.incoming": transaction}}, {}, function(err, doc){
 			res.status(200).send();		
 		});
@@ -156,7 +156,7 @@ app.post("/updateCounter/tg", function(req, res) {
 		date: date(),
 	};
 
-	if( !amt.isNaN() )
+	if( Number(amt) != NaN )
 		db.update({phone: from}, {$inc: {counter: amt}, $push: {"transactions.incoming": transaction}}, {}, function(err, doc) {
 		   res.status(200).send(); 
 		});
@@ -180,7 +180,7 @@ app.post("/updateCounter/air", function(req, res) {
 		date: date(),
 	};
 	
-	if( !amt.isNaN() )
+	if( Number(amt) != NaN )
 		db.update({phone: from}, {$inc: {counter: amt}, $push: {"transactions.incoming": transaction}}, {}, function(err, doc) {
 			if(!err)
 		   		res.status(200).send(); 
