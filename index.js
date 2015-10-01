@@ -124,7 +124,7 @@ app.post("/updateCounter/mtn", function(req, res) {
 	var row_from = msg_parts[i].substr(1, msg_parts[i].length - 2);
 	
 	var mmm = row_from + " > " + row_amt;
-	console.log(mmm);
+	console.log(row_amt);
 
 	var transaction = {
 		type: INCOME_TRANSACTION,
@@ -133,10 +133,11 @@ app.post("/updateCounter/mtn", function(req, res) {
 		date: date(),
 	};
 	
-	if( Number(row_amt) != NaN )
+	if( !isNaN(row_amt) ){
 		db.update({phone: row_from}, {$inc:{counter: row_amt}, $push: {"transactions.incoming": transaction}}, {}, function(err, doc){
 			res.status(200).send();		
 		});
+	}
 	else 
 		res.status(400).send();
 });
@@ -156,7 +157,7 @@ app.post("/updateCounter/tg", function(req, res) {
 		date: date(),
 	};
 
-	if( Number(amt) != NaN )
+	if( !isNaN(amt) )
 		db.update({phone: from}, {$inc: {counter: amt}, $push: {"transactions.incoming": transaction}}, {}, function(err, doc) {
 		   res.status(200).send(); 
 		});
@@ -180,7 +181,7 @@ app.post("/updateCounter/air", function(req, res) {
 		date: date(),
 	};
 	
-	if( Number(amt) != NaN )
+	if( !isNaN(amt) )
 		db.update({phone: from}, {$inc: {counter: amt}, $push: {"transactions.incoming": transaction}}, {}, function(err, doc) {
 			if(!err)
 		   		res.status(200).send(); 
